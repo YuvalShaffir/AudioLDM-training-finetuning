@@ -15,8 +15,10 @@ import yaml
 import torch
 
 from tqdm import tqdm
+from pytorch_lightning.strategies.single_device import SingleDeviceStrategy
 from pytorch_lightning.strategies.ddp import DDPStrategy
 from audioldm_train.utilities.data.dataset import AudioDataset
+
 
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer, seed_everything
@@ -152,6 +154,7 @@ def main(configs, config_yaml_path, exp_group_name, exp_name, perform_validation
     print("==> Save checkpoint every %s steps" % save_checkpoint_every_n_steps)
     print("==> Perform validation every %s epochs" % validation_every_n_epochs)
 
+
     trainer = Trainer(
         accelerator="gpu",
         devices=devices,
@@ -160,9 +163,12 @@ def main(configs, config_yaml_path, exp_group_name, exp_name, perform_validation
         num_sanity_val_steps=1,
         limit_val_batches=limit_val_batches,
         check_val_every_n_epoch=validation_every_n_epochs,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        # strategy=DDPStrategy(find_unused_parameters=True), # TODO: check if this solved the NCCL error
         callbacks=[checkpoint_callback],
     )
+
+    # os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"  # TODO: remove?
+
 
     if is_external_checkpoints:
         if resume_from_checkpoint is not None:
