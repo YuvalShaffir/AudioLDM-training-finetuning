@@ -8,17 +8,15 @@ sys.path.append("src")
 import shutil
 import os
 
-os.environ["TOKENIZERS_PARALLELISM"] = "true"
+# os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 import argparse
 import yaml
 import torch
 
 from tqdm import tqdm
-from pytorch_lightning.strategies.single_device import SingleDeviceStrategy
 from pytorch_lightning.strategies.ddp import DDPStrategy
 from audioldm_train.utilities.data.dataset import AudioDataset
-
 
 from torch.utils.data import DataLoader
 from pytorch_lightning import Trainer, seed_everything
@@ -137,7 +135,7 @@ def main(configs, config_yaml_path, exp_group_name, exp_name, perform_validation
         print("Train from scratch")
         resume_from_checkpoint = None
 
-    devices = torch.cuda.device_count()
+    # devices = torch.cuda.device_count()
 
     latent_diffusion = instantiate_from_config(configs["model"])
     latent_diffusion.set_log_dir(log_path, exp_group_name, exp_name)
@@ -154,21 +152,20 @@ def main(configs, config_yaml_path, exp_group_name, exp_name, perform_validation
     print("==> Save checkpoint every %s steps" % save_checkpoint_every_n_steps)
     print("==> Perform validation every %s epochs" % validation_every_n_epochs)
 
+    # ADDED THIS LINE MYSELF
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Set to use only GPU 0
 
     trainer = Trainer(
-        accelerator="gpu",
-        devices=devices,
+        accelerator="cuda",  # was "cuda"
+        devices="auto",  # was auto
         logger=wandb_logger,
         max_steps=max_steps,
         num_sanity_val_steps=1,
         limit_val_batches=limit_val_batches,
         check_val_every_n_epoch=validation_every_n_epochs,
-        # strategy=DDPStrategy(find_unused_parameters=True), # TODO: check if this solved the NCCL error
+        strategy="auto",  # was "ddp_notebook_find_unused_parameters_false"
         callbacks=[checkpoint_callback],
     )
-
-    # os.environ["PL_TORCH_DISTRIBUTED_BACKEND"] = "gloo"  # TODO: remove?
-
 
     if is_external_checkpoints:
         if resume_from_checkpoint is not None:
@@ -234,7 +231,8 @@ if __name__ == "__main__":
 
     perform_validation = args.val
 
-    assert torch.cuda.is_available(), "CUDA is not available"
+    # uncheck this if lightining does problems
+    # assert torch.cuda.is_available(), "CUDA is not available"
 
     config_yaml = args.config_yaml
 
